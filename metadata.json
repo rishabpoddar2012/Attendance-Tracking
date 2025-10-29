@@ -1,0 +1,7 @@
+{
+  "name": "Copy of PulseHR - Attendance & Leave Management",
+  "description": "A functional prototype of a SaaS-style attendance and leave management system for small businesses, built with React and Tailwind CSS.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
