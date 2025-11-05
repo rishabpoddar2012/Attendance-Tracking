@@ -1,30 +1,50 @@
-export interface Employee {
+export type UserRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN';
+
+export interface Company {
   id: string;
-  employeeId: number;
   name: string;
-  email: string;
-  department: 'Sales' | 'Ops' | 'HR' | 'Finance' | 'Other';
-  role: 'Staff' | 'Manager' | 'Owner';
-  active: boolean;
-  annualLeaveBalance: number;
-  leaveTaken: number;
+  code: string; // Unique join code
+  office_lat: number;
+  office_lng: number;
 }
 
-export interface AttendanceRecord {
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  password?: string; // Add password for login
+  department: 'Sales' | 'Engineering' | 'HR' | 'Marketing' | 'Operations';
+  role: UserRole;
+  companyId: string;
+  active: boolean;
+  companyCode: string;
+  googleCalendarId?: string | null; // Unique ID for the user's Google Calendar
+  isGoogleCalendarConnected?: boolean; // Tracks if user has "granted permission"
+}
+
+export interface Attendance {
   id: string;
   employeeId: string;
   date: string; // YYYY-MM-DD
-  checkInTime: string | null; // ISO String
-  checkOutTime: string | null; // ISO String
-  source: 'Manual' | 'Fingerprint' | 'WhatsApp';
+  checkIn: string | null; // ISO String
+  checkOut: string | null; // ISO String
+  hoursWorked: number;
+  mode: 'WFO' | 'WFH';
+  location_lat: number | null;
+  location_lng: number | null;
+  status: 'PRESENT' | 'INCOMPLETE';
 }
 
-export interface LeaveRequest {
+export interface Leave {
   id: string;
   employeeId: string;
-  from: string; // YYYY-MM-DD
-  to: string; // YYYY-MM-DD
+  fromDate: string; // YYYY-MM-DD
+  toDate: string; // YYYY-MM-DD
   reason: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
-  approvedById: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvedBy: string | null; // Employee ID of manager/admin
+  calendarEventId: string | null;
+  attachment?: {
+    name: string;
+  } | null;
 }

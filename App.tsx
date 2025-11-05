@@ -1,214 +1,265 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Employee, AttendanceRecord, LeaveRequest } from './types';
-import { initialEmployees, initialAttendance, initialLeaveRequests } from './data';
+import type { Employee, Attendance, Leave, Company } from './types';
+import { initialCompanies, initialEmployees, initialAttendance, initialLeaves } from './data';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 
 export const AppContext = React.createContext<any>(null);
 
-// Helper to calculate distance between two lat/lon points in meters
-const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371e3; // metres
-  const φ1 = lat1 * Math.PI/180;
-  const φ2 = lat2 * Math.PI/180;
-  const Δφ = (lat2-lat1) * Math.PI/180;
-  const Δλ = (lon2-lon1) * Math.PI/180;
+// Helper function to generate a classroom-style company code
+const generateCompanyCode = (): string => {
+    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789'; // Avoid ambiguous chars like O, 0, I, l
+    let result = '';
+    for (let i = 0; i < 7; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+        if (i === 2) {
+            result += '-';
+        }
+    }
+    return result;
+};
 
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-          Math.cos(φ1) * Math.cos(φ2) *
-          Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-  return R * c;
+interface AppData {
+  companies: Company[];
+  employees: Employee[];
+  attendance: Attendance[];
+  leaves: Leave[];
 }
 
 const App: React.FC = () => {
-  const [employees, setEmployees] = useState<Employee[]>(() => {
-    const saved = localStorage.getItem('pulsehr-employees');
-    return saved ? JSON.parse(saved) : initialEmployees;
+  // --- UNIFIED STATE MANAGEMENT ---
+  const [appData, setAppData] = useState<AppData>(() => {
+    try {
+      const saved = localStorage.getItem('pulsehr-appData');
+      return saved ? JSON.parse(saved) : { companies: initialCompanies, employees: initialEmployees, attendance: initialAttendance, leaves: initialLeaves };
+    } catch (error) {
+      console.error("Failed to parse appData from localStorage", error);
+      return { companies: initialCompanies, employees: initialEmployees, attendance: initialAttendance, leaves: initialLeaves };
+    }
   });
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
-    const saved = localStorage.getItem('pulsehr-attendance');
-    return saved ? JSON.parse(saved) : initialAttendance;
+
+  const [currentUser, setCurrentUser] = useState<Employee | null>(() => {
+    try {
+      const saved = localStorage.getItem('pulsehr-currentUser');
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error("Failed to parse currentUser from localStorage", error);
+      return null;
+    }
   });
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => {
-    const saved = localStorage.getItem('pulsehr-leaveRequests');
-    return saved ? JSON.parse(saved) : initialLeaveRequests;
-  });
-  const [officeLocation, setOfficeLocation] = useState<{lat: number, lon: number}>(() => {
-    const saved = localStorage.getItem('pulsehr-officeLocation');
-    return saved ? JSON.parse(saved) : { lat: 37.7749, lon: -122.4194 }; // Default SF
-  });
+
+  // --- PERSISTENCE FIX ---
+  // A dedicated function to update state and localStorage atomically.
+  // This is more reliable than relying on useEffect for critical saves.
+  const updateAppData = (newData: AppData) => {
+    localStorage.setItem('pulsehr-appData', JSON.stringify(newData));
+    setAppData(newData);
+  };
   
-  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
+  // Persist current user separately
+  useEffect(() => { 
+    localStorage.setItem('pulsehr-currentUser', JSON.stringify(currentUser));
+  }, [currentUser]);
 
-  useEffect(() => {
-    localStorage.setItem('pulsehr-employees', JSON.stringify(employees));
-  }, [employees]);
-  useEffect(() => {
-    localStorage.setItem('pulsehr-attendance', JSON.stringify(attendance));
-  }, [attendance]);
-  useEffect(() => {
-    localStorage.setItem('pulsehr-leaveRequests', JSON.stringify(leaveRequests));
-  }, [leaveRequests]);
-  useEffect(() => {
-    localStorage.setItem('pulsehr-officeLocation', JSON.stringify(officeLocation));
-  }, [officeLocation]);
-
-
-  const handleLogin = (employeeId: string) => {
-    const user = employees.find(e => e.id === employeeId);
+  // --- API-LIKE FUNCTIONS (refactored for atomic state updates) ---
+  const handleLogin = (email: string, password: string): boolean => {
+    const user = appData.employees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
     if (user) {
       setCurrentUser(user);
+      return true;
     }
+    return false;
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
+  const handleLogout = () => setCurrentUser(null);
+
+  const handleCreateCompanyAndAdmin = (companyName: string, adminName: string, adminEmail: string, adminPassword: string) => {
+    const newCompanyCode = generateCompanyCode();
+    const newCompany: Company = {
+      id: `comp-${Date.now()}`,
+      name: companyName,
+      code: newCompanyCode,
+      office_lat: 0,
+      office_lng: 0,
+    };
+
+    const newAdmin: Employee = {
+      id: `emp-${Date.now()}`,
+      name: adminName,
+      email: adminEmail,
+      password: adminPassword,
+      department: 'HR', // Default for admin
+      role: 'ADMIN',
+      companyId: newCompany.id,
+      active: true,
+      companyCode: newCompany.code,
+      googleCalendarId: `cal-${adminEmail.toLowerCase()}`,
+      isGoogleCalendarConnected: false,
+    };
+    
+    updateAppData({
+        ...appData,
+        companies: [...appData.companies, newCompany],
+        // FIX: Use `appData` instead of `app` which is not defined.
+        employees: [...appData.employees, newAdmin],
+    });
+    setCurrentUser(newAdmin);
+    alert(`Company created! Your company code is: ${newCompanyCode}`);
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
 
-  const handleCheckIn = (onStatus: (msg: string, isError?: boolean) => void) => {
+  const handleRegister = (name: string, email: string, password: string, department: Employee['department'], role: Employee['role'], companyCode: string) => {
+    const company = appData.companies.find(c => c.code.toUpperCase() === companyCode.toUpperCase());
+    if (!company) {
+      alert('Invalid company code.');
+      return false;
+    }
+    if (appData.employees.some(e => e.email.toLowerCase() === email.toLowerCase())) {
+        alert('An employee with this email already exists.');
+        return false;
+    }
+
+    const newEmployee: Employee = {
+      id: `emp-${Date.now()}`,
+      name,
+      email,
+      password,
+      department,
+      role,
+      companyId: company.id,
+      active: true,
+      companyCode: company.code,
+      googleCalendarId: `cal-${email.toLowerCase()}`,
+      isGoogleCalendarConnected: false,
+    };
+
+    updateAppData({ ...appData, employees: [...appData.employees, newEmployee] });
+    setCurrentUser(newEmployee);
+    return true;
+  };
+  
+  const handleCheckIn = (lat: number, lng: number, mode: 'WFO' | 'WFH') => {
     if (!currentUser) return;
-    const existingEntry = attendance.find(a => a.employeeId === currentUser.id && a.date === todayStr);
-    if (existingEntry) return;
-
-    onStatus("Getting your location...", false);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const distance = getDistance(latitude, longitude, officeLocation.lat, officeLocation.lon);
-        
-        if (distance <= 100) { // 100 meters radius
-            const newRecord: AttendanceRecord = {
-              id: `att-${Date.now()}`,
-              employeeId: currentUser.id,
-              date: todayStr,
-              checkInTime: new Date().toISOString(),
-              checkOutTime: null,
-              source: 'Manual',
-            };
-            setAttendance(prev => [...prev, newRecord]);
-            onStatus("Check-in successful!", false);
-        } else {
-            onStatus(`You are ${Math.round(distance)} meters away. You must be within 100m of the office to check in.`, true);
-        }
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        onStatus("Could not get your location. Please enable location services.", true);
-      },
-      { enableHighAccuracy: true }
-    );
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newRecord: Attendance = {
+      id: `att-${Date.now()}`,
+      employeeId: currentUser.id,
+      date: todayStr,
+      checkIn: new Date().toISOString(),
+      checkOut: null,
+      hoursWorked: 0,
+      mode,
+      location_lat: lat,
+      location_lng: lng,
+      status: 'PRESENT',
+    };
+    updateAppData({ ...appData, attendance: [...appData.attendance, newRecord] });
   };
 
   const handleCheckOut = () => {
     if (!currentUser) return;
-    setAttendance(prev => prev.map(record => 
-      (record.employeeId === currentUser.id && record.date === todayStr)
-        ? { ...record, checkOutTime: new Date().toISOString() }
-        : record
-    ));
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    const newAttendance = appData.attendance.map(rec => {
+      if (rec.employeeId === currentUser.id && rec.date === todayStr && rec.checkOut === null) {
+        const checkOutTime = new Date();
+        const checkInTime = new Date(rec.checkIn!);
+        const hoursWorked = parseFloat(((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
+        return {
+          ...rec,
+          checkOut: checkOutTime.toISOString(),
+          hoursWorked,
+          status: (hoursWorked >= 8 ? 'PRESENT' : 'INCOMPLETE') as 'PRESENT' | 'INCOMPLETE',
+        };
+      }
+      return rec;
+    });
+
+    updateAppData({ ...appData, attendance: newAttendance });
   };
   
-  const handleApplyLeave = (from: string, to: string, reason: string) => {
+  const handleApplyLeave = (fromDate: string, toDate: string, reason: string, attachment: { name: string } | null) => {
     if (!currentUser) return;
-    const newRequest: LeaveRequest = {
+    const newRequest: Leave = {
       id: `leave-${Date.now()}`,
       employeeId: currentUser.id,
-      from,
-      to,
+      fromDate,
+      toDate,
       reason,
-      status: 'Pending',
-      approvedById: null,
+      status: 'PENDING',
+      approvedBy: null,
+      calendarEventId: null,
+      attachment,
     };
-    setLeaveRequests(prev => [...prev, newRequest]);
+    updateAppData({ ...appData, leaves: [...appData.leaves, newRequest] });
   };
 
-  const handleLeaveAction = (leaveId: string, status: 'Approved' | 'Rejected') => {
-    if (!currentUser || currentUser.role === 'Staff') return;
-    
-    let leaveToProcess: LeaveRequest | undefined;
-    const updatedLeaveRequests = leaveRequests.map(req => {
-      if (req.id === leaveId) {
-        leaveToProcess = { ...req, status, approvedById: currentUser.id };
-        return leaveToProcess;
-      }
-      return req;
+  const handleLeaveAction = async (leaveId: string, status: 'APPROVED' | 'REJECTED') => {
+    if (!currentUser || currentUser.role === 'EMPLOYEE') return;
+    await new Promise(resolve => setTimeout(resolve, 700));
+
+    const newLeaves = appData.leaves.map(req => {
+        if (req.id === leaveId) {
+            const employee = appData.employees.find(e => e.id === req.employeeId);
+            if (!employee) return req;
+
+            if (status === 'APPROVED') {
+                if (employee.isGoogleCalendarConnected) {
+                    const newCalendarEventId = `gcal-${Date.now()}`;
+                    console.log(`Simulating: Creating event on calendar ${employee.googleCalendarId} for ${employee.name}. Event ID: ${newCalendarEventId}`);
+                    return { ...req, status, approvedBy: currentUser.id, calendarEventId: newCalendarEventId };
+                } else {
+                    console.log(`Simulating: Approving leave for ${employee.name}, but calendar event not created as they haven't connected their Google Calendar.`);
+                    return { ...req, status, approvedBy: currentUser.id, calendarEventId: null };
+                }
+            }
+            
+            if (req.status === 'APPROVED' && req.calendarEventId && employee.googleCalendarId) {
+                 console.log(`Simulating: Deleting event ${req.calendarEventId} from calendar ${employee.googleCalendarId} for ${employee.name}.`);
+            }
+            return { ...req, status, approvedBy: currentUser.id, calendarEventId: null };
+        }
+        return req;
     });
-    setLeaveRequests(updatedLeaveRequests);
-
-    if (status === 'Approved' && leaveToProcess) {
-      const fromDate = new Date(leaveToProcess.from);
-      const toDate = new Date(leaveToProcess.to);
-      const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-      setEmployees(prev => prev.map(emp => 
-        emp.id === leaveToProcess!.employeeId 
-          ? { ...emp, leaveTaken: emp.leaveTaken + diffDays }
-          : emp
-      ));
-    }
+    updateAppData({ ...appData, leaves: newLeaves });
   };
 
-  const handleAddNewEmployee = (name: string, email: string, department: Employee['department'], role: 'Staff' | 'Manager') => {
-    const newEmployee: Employee = {
-        id: `emp-${Date.now()}`,
-        employeeId: Math.floor(1000 + Math.random() * 9000), // random ID
-        name,
-        email,
-        department,
-        role,
-        active: true,
-        annualLeaveBalance: 20,
-        leaveTaken: 0,
-    };
-    setEmployees(prev => [...prev, newEmployee]);
+  const handleUpdateOfficeLocation = (lat: number, lng: number) => {
+    if (currentUser?.role !== 'ADMIN') return;
+    const newCompanies = appData.companies.map(c => c.id === currentUser.companyId ? { ...c, office_lat: lat, office_lng: lng } : c);
+    updateAppData({ ...appData, companies: newCompanies });
   };
 
-  const handleSetOfficeLocation = (lat: number, lon: number) => {
-    if(currentUser?.role === 'Owner') {
-        setOfficeLocation({ lat, lon });
-    }
+  const handleToggleGCalConnection = () => {
+      if (!currentUser) return;
+      const newEmployees = appData.employees.map(e => e.id === currentUser.id ? { ...e, isGoogleCalendarConnected: !e.isGoogleCalendarConnected } : e);
+      updateAppData({ ...appData, employees: newEmployees });
+      // Also update the currentUser state to reflect the change immediately in the UI
+      setCurrentUser(prevUser => prevUser ? { ...prevUser, isGoogleCalendarConnected: !prevUser.isGoogleCalendarConnected } : null);
+      alert(`Simulated: Google Calendar has been ${!currentUser.isGoogleCalendarConnected ? 'connected' : 'disconnected'}.`);
   };
-
-  const handleResetData = () => {
-    if (currentUser?.role === 'Owner') {
-      if (window.confirm("Are you sure you want to reset all data to the initial demo state? This cannot be undone.")) {
-        setEmployees(initialEmployees);
-        setAttendance(initialAttendance);
-        setLeaveRequests(initialLeaveRequests);
-        setOfficeLocation({ lat: 37.7749, lon: -122.4194 });
-        alert("Application data has been reset.");
-      }
-    }
-  };
-
+  
   const contextValue = useMemo(() => ({
-    employees,
-    attendance,
-    leaveRequests,
     currentUser,
-    officeLocation,
+    companies: appData.companies,
+    employees: appData.employees,
+    attendance: appData.attendance,
+    leaves: appData.leaves,
+    handleLogin,
     handleLogout,
+    handleRegister,
+    handleCreateCompanyAndAdmin,
     handleCheckIn,
     handleCheckOut,
     handleApplyLeave,
     handleLeaveAction,
-    handleAddNewEmployee,
-    handleSetOfficeLocation,
-    handleResetData,
-  }), [employees, attendance, leaveRequests, currentUser, officeLocation]);
-
-  if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} employees={employees} />;
-  }
+    handleUpdateOfficeLocation,
+    handleToggleGCalConnection,
+  }), [currentUser, appData]);
 
   return (
     <AppContext.Provider value={contextValue}>
-      <Dashboard />
+      {currentUser ? <Dashboard /> : <LoginScreen />}
     </AppContext.Provider>
   );
 };

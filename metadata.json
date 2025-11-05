@@ -1,6 +1,6 @@
 {
-  "name": "Copy of PulseHR - Attendance & Leave Management",
-  "description": "A functional prototype of a SaaS-style attendance and leave management system for small businesses, built with React and Tailwind CSS.",
+  "name": "PulseHR - Attendance & Leave Management",
+  "description": "A clean, professional attendance and leave management system for small businesses. Built with a focus on great UI/UX.",
   "requestFramePermissions": [
     "geolocation"
   ]

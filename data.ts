@@ -1,4 +1,4 @@
-import type { Employee, AttendanceRecord, LeaveRequest } from './types';
+import type { Company, Employee, Attendance, Leave } from './types';
 
 const today = new Date();
 const yesterday = new Date();
@@ -7,23 +7,31 @@ yesterday.setDate(today.getDate() - 1);
 const todayStr = today.toISOString().split('T')[0];
 const yesterdayStr = yesterday.toISOString().split('T')[0];
 
+export const initialCompanies: Company[] = [
+    { id: 'comp-1', name: 'Innovate Inc.', code: 'INNOV8', office_lat: 34.052235, office_lng: -118.243683 },
+    { id: 'comp-2', name: 'Synergy Corp.', code: 'SYN456', office_lat: 40.712776, office_lng: -74.005974 },
+];
+
 export const initialEmployees: Employee[] = [
-  { id: 'emp-1', employeeId: 101, name: 'Alice Johnson', email: 'alice@example.com', department: 'Sales', role: 'Staff', active: true, annualLeaveBalance: 20, leaveTaken: 5 },
-  { id: 'emp-2', employeeId: 102, name: 'Bob Williams', email: 'bob@example.com', department: 'Ops', role: 'Staff', active: true, annualLeaveBalance: 20, leaveTaken: 10 },
-  { id: 'emp-3', employeeId: 201, name: 'Charlie Brown', email: 'charlie@example.com', department: 'Ops', role: 'Manager', active: true, annualLeaveBalance: 25, leaveTaken: 4 },
-  { id: 'emp-4', employeeId: 1, name: 'Diana Prince', email: 'diana@example.com', department: 'HR', role: 'Owner', active: true, annualLeaveBalance: 30, leaveTaken: 10 },
+    // Innovate Inc. Employees
+    { id: 'emp-1', name: 'Alice Smith', email: 'employee@pulse.com', password: 'password123', department: 'Engineering', role: 'EMPLOYEE', companyId: 'comp-1', active: true, companyCode: 'INNOV8', googleCalendarId: 'cal-alice@pulse.com', isGoogleCalendarConnected: true },
+    { id: 'emp-2', name: 'Bob Johnson', email: 'manager@pulse.com', password: 'password123', department: 'Engineering', role: 'MANAGER', companyId: 'comp-1', active: true, companyCode: 'INNOV8', googleCalendarId: 'cal-bob@pulse.com', isGoogleCalendarConnected: true },
+    { id: 'emp-3', name: 'Charlie Day', email: 'charlie@innovate.com', password: 'password123', department: 'Marketing', role: 'EMPLOYEE', companyId: 'comp-1', active: true, companyCode: 'INNOV8', googleCalendarId: 'cal-charlie@innovate.com', isGoogleCalendarConnected: false },
+    { id: 'emp-4', name: 'Diana Ross', email: 'admin@pulse.com', password: 'password123', department: 'HR', role: 'ADMIN', companyId: 'comp-1', active: true, companyCode: 'INNOV8', googleCalendarId: 'cal-diana@pulse.com', isGoogleCalendarConnected: true },
+    
+    // Synergy Corp. Employees
+    { id: 'emp-5', name: 'Ethan Hunt', email: 'ethan@synergy.com', password: 'password123', department: 'Sales', role: 'EMPLOYEE', companyId: 'comp-2', active: true, companyCode: 'SYN456', googleCalendarId: 'cal-ethan@synergy.com', isGoogleCalendarConnected: false },
+    { id: 'emp-6', name: 'Fiona Glenanne', email: 'fiona@synergy.com', password: 'password123', department: 'Sales', role: 'MANAGER', companyId: 'comp-2', active: true, companyCode: 'SYN456', googleCalendarId: 'cal-fiona@synergy.com', isGoogleCalendarConnected: true },
 ];
 
-export const initialAttendance: AttendanceRecord[] = [
-  // Yesterday's data
-  { id: 'att-1', employeeId: 'emp-1', date: yesterdayStr, checkInTime: `${yesterdayStr}T09:01:00.000Z`, checkOutTime: `${yesterdayStr}T17:30:00.000Z`, source: 'Manual' },
-  { id: 'att-2', employeeId: 'emp-2', date: yesterdayStr, checkInTime: `${yesterdayStr}T09:15:00.000Z`, checkOutTime: `${yesterdayStr}T17:00:00.000Z`, source: 'Manual' },
-  { id: 'att-3', employeeId: 'emp-3', date: yesterdayStr, checkInTime: `${yesterdayStr}T08:55:00.000Z`, checkOutTime: `${yesterdayStr}T18:05:00.000Z`, source: 'Manual' },
-  // Today's data
-  { id: 'att-4', employeeId: 'emp-3', date: todayStr, checkInTime: `${todayStr}T08:58:00.000Z`, checkOutTime: null, source: 'Manual' },
+export const initialAttendance: Attendance[] = [
+    { id: 'att-1', employeeId: 'emp-1', date: yesterdayStr, checkIn: `${yesterdayStr}T09:05:00Z`, checkOut: `${yesterdayStr}T17:35:00Z`, hoursWorked: 8.5, mode: 'WFO', status: 'PRESENT', location_lat: 34.052, location_lng: -118.243 },
+    { id: 'att-2', employeeId: 'emp-3', date: yesterdayStr, checkIn: `${yesterdayStr}T09:30:00Z`, checkOut: `${yesterdayStr}T17:00:00Z`, hoursWorked: 7.5, mode: 'WFH', status: 'INCOMPLETE', location_lat: null, location_lng: null },
+    { id: 'att-3', employeeId: 'emp-2', date: todayStr, checkIn: `${todayStr}T08:58:00Z`, checkOut: null, hoursWorked: 0, mode: 'WFO', status: 'PRESENT', location_lat: 34.052, location_lng: -118.243 },
 ];
 
-export const initialLeaveRequests: LeaveRequest[] = [
-  { id: 'leave-1', employeeId: 'emp-2', from: '2024-08-20', to: '2024-08-22', reason: 'Family vacation.', status: 'Approved', approvedById: 'emp-3' },
-  { id: 'leave-2', employeeId: 'emp-1', from: `${todayStr}`, to: `${todayStr}`, reason: 'Doctor\'s appointment in the afternoon.', status: 'Pending', approvedById: null },
+export const initialLeaves: Leave[] = [
+    { id: 'leave-1', employeeId: 'emp-1', fromDate: '2024-09-10', toDate: '2024-09-12', reason: 'Family vacation', status: 'APPROVED', approvedBy: 'emp-2', calendarEventId: 'gcal-123', attachment: { name: 'flight-tickets.pdf' } },
+    { id: 'leave-2', employeeId: 'emp-3', fromDate: `${todayStr}`, toDate: `${todayStr}`, reason: 'Doctor\'s appointment', status: 'PENDING', approvedBy: null, calendarEventId: null },
+    { id: 'leave-3', employeeId: 'emp-5', fromDate: '2024-09-15', toDate: '2024-09-15', reason: 'Personal day', status: 'PENDING', approvedBy: null, calendarEventId: null },
 ];
